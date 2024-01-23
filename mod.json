@@ -10,6 +10,11 @@
 	"developer": "RedLime",
 	"description": "Integrate GMD Korea Forum: Stats rank into ingame profile",
 	"tags": [],
+	"repository": "https://github.com/RedLime/KR-Profile-Leaderboard",
+	"issues": {
+		"info": "GitHub",
+		"url": "https://github.com/RedLime/KR-Profile-Leaderboard"
+	},
 	"dependencies": [
 		{
             "id": "geode.node-ids",
