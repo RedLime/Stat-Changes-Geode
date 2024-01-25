@@ -12,7 +12,10 @@ int lastAccountID = 0;
 void updateLabel(int liveStat, int oldStat, cocos2d::CCLabelBMFont* label) {
 	const int changes = liveStat - oldStat;
 	if (changes != 0 && oldStat != 0 && label != nullptr && label->isVisible()) {
-		std::string changeText = std::to_string(abs(changes));
+		std::ostringstream ss;
+		ss.imbue(std::locale("en_US.UTF-8"));
+		ss << abs(changes);
+		std::string changeText = ss.str();
 
 		auto newLabel = CCLabelBMFont::create("", "bigFont.fnt");
 		float scale = Mod::get()->getSettingValue<double>("textScale");
