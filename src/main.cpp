@@ -1,145 +1,84 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/ProfilePage.hpp>
 #include <Geode/utils/web.hpp>
-#include <cmath>
 
 using namespace geode::prelude;
-using namespace std::chrono;
 
-int totalClicks = 0;
-matjson::Value updatedStars = NULL;
-matjson::Value updatedDemons = NULL;
-matjson::Value updatedCoins = NULL;
-matjson::Value updatedDiamonds = NULL;
-matjson::Value updatedCp = NULL;
+ProfilePage* profilePage = nullptr;
+matjson::Value cachedJson = nullptr;
+int lastAccountID = 0;
 
-auto lastRefreshed = system_clock::now() - minutes(60);
-void refreshStats() {
-	if (updatedStars != NULL || system_clock::now() - lastRefreshed < minutes(5)) return;
 
-	lastRefreshed = system_clock::now();
-	web::AsyncWebRequest()
-		.fetch("https://gmdkoreaforum.com/api/statrank/stars")
-		.json()
-		.then([](matjson::Value const& json) {
-			if (json["status"].as_string() == "success") {
-				updatedStars = json["data"];
-			}
-		})
-		.expect([](std::string const& error) {
-			log::debug("KFSTATS Error: {}", error);
-		});
-	web::AsyncWebRequest()
-		.fetch("https://gmdkoreaforum.com/api/statrank/demons")
-		.json()
-		.then([](matjson::Value const& json) {
-			if (json["status"].as_string() == "success") {
-				updatedDemons = json["data"];
-			}
-		})
-		.expect([](std::string const& error) {
-			log::debug("KFSTATS Error: {}", error);
-		});
-	web::AsyncWebRequest()
-		.fetch("https://gmdkoreaforum.com/api/statrank/coins")
-		.json()
-		.then([](matjson::Value const& json) {
-			if (json["status"].as_string() == "success") {
-				updatedCoins = json["data"];
-			}
-		})
-		.expect([](std::string const& error) {
-			log::debug("KFSTATS Error: {}", error);
-		});
-	web::AsyncWebRequest()
-		.fetch("https://gmdkoreaforum.com/api/statrank/cp")
-		.json()
-		.then([](matjson::Value const& json) {
-			if (json["status"].as_string() == "success") {
-				updatedCp = json["data"];
-			}
-		})
-		.expect([](std::string const& error) {
-			log::debug("KFSTATS Error: {}", error);
-		});
-	// web::AsyncWebRequest()
-	// 	.fetch("https://gmdkoreaforum.com/api/statrank/diamonds")
-	// 	.json()
-	// 	.then([](matjson::Value const& json) {
-	// 		if (json["status"].as_string() == "success") {
-	// 			updatedDiamonds = json["data"];
-	// 		}
-	// 	})
-	// 	.expect([](std::string const& error) {
-	// 		log::debug("KFSTATS Error: {}", error);
-	// 	});
-	return;
+void updateLabel(int liveStat, int oldStat, cocos2d::CCLabelBMFont* label) {
+	const int changes = liveStat - oldStat;
+	if (changes != 0 && oldStat != 0 && label != nullptr && label->isVisible()) {
+		std::string changeText = std::to_string(abs(changes));
+
+		auto newLabel = CCLabelBMFont::create("", "bigFont.fnt");
+		float scale = Mod::get()->getSettingValue<double>("textScale");
+		newLabel->setAlignment(kCCTextAlignmentCenter);
+		newLabel->setString(changeText.c_str());
+		newLabel->setScale(label->getScale() * scale);
+
+		auto spr = changes > 0 ? CCSprite::create("up_arrow.png"_spr) : CCSprite::create("down_arrow.png"_spr);
+		spr->setScale(newLabel->getScale() * 0.7f);
+		spr->setPosition({ (label->getScaledContentSize().width / 2) - (newLabel->getScaledContentSize().width / 2) - (spr->getScaledContentSize().width / 5), spr->getPositionY() - 1 });
+		newLabel->setPositionX((label->getScaledContentSize().width / 2) + (spr->getScaledContentSize().width / 2));
+		label->getParent()->addChild(spr);
+		
+		label->setAnchorPoint({ label->getAnchorPoint().x, label->getAnchorPoint().y - 0.3f });
+		label->getParent()->addChild(newLabel);
+
+		label->getParent()->setPositionY(label->getParent()->getPositionY() + ((newLabel->getScaledContentSize().height) / 5));
+		label->getParent()->updateLayout();
+	}
 }
 
-void updateLabel(int accountID, int stats, matjson::Value json, cocos2d::CCLabelBMFont* label) {
-	if (json == NULL || label == nullptr) return;
-	auto array = json.as_array();
-	for (int i = 0; i < array.size(); i++) {
-		const int accountId = array.at(i)["account_id"].as_int();
-		if (accountId == accountID) {
-			const int changes = stats - array.at(i)["prev_stat_value"].as_int();
-			if (changes != 0) {
-				std::string originalText = label->getString();
-				std::string appendText = "";
-				appendText = appendText + "(" + (changes >= 0 ? "+" : "") + std::to_string(changes) + ")";
-				std::string changeText = "";
-				changeText = changeText + label->getString() + "\n" + appendText;
-				label->setAlignment(kCCTextAlignmentCenter);
-				label->setString(changeText.c_str(), true);
-
-				int lengthDiff = appendText.length() - 1 - originalText.length();
-				if (lengthDiff > 0) {
-					label->setScale(label->getScale() * std::pow(0.9, lengthDiff + 1));
-				}
-			}
-			break;
-		}
+void tryUpdateLabels() {
+	if (profilePage == nullptr || profilePage->m_accountID != lastAccountID) return;
+	
+	auto starsLebel = profilePage->m_mainLayer->getChildByIDRecursive("stars-label");
+	if (cachedJson == nullptr || starsLebel == nullptr || !starsLebel->isVisible()) {
+		Loader::get()->queueInMainThread(&tryUpdateLabels);
+		return;
 	}
+	if (cachedJson.is_null()) return;
+
+	updateLabel(profilePage->m_score->m_stars, cachedJson["stars"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(starsLebel));
+	updateLabel(profilePage->m_score->m_moons, cachedJson["moons"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("moons-label")));
+	updateLabel(profilePage->m_score->m_userCoins, cachedJson["ucoins"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("user-coins-label")));
+	updateLabel(profilePage->m_score->m_demons, cachedJson["demons"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("demons-label")));
+	updateLabel(profilePage->m_score->m_creatorPoints, cachedJson["cp"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("creator-points-label")));
 }
 
 class $modify(ProfilePage) {
 	bool init(int p0, bool p1) {
 		if (!ProfilePage::init(p0, p1)) return false;
-		refreshStats();
+		
+		auto weeks = Mod::get()->getSettingValue<int64_t>("weeks");
+		std::string targetUrl = "https://me.redlimerl.com/gdstats/" + std::to_string(p0) + "/" + std::to_string(weeks);
+
+		if (p0 != lastAccountID) {
+			cachedJson = nullptr;
+			web::AsyncWebRequest()
+				.get(targetUrl)
+				.json()
+				.then([p0](matjson::Value const& json) {
+					cachedJson = json;
+				})
+				.expect([](std::string const& error) {
+					cachedJson = matjson::parse("null"); 
+				});
+		}
+			
+		lastAccountID = p0;
+		profilePage = this;
+		tryUpdateLabels();
 		return true;
 	}
 
-	virtual void loadPageFromUserInfo(GJUserScore* p0) {
-		ProfilePage::loadPageFromUserInfo(p0);
-
-		const auto profileId = p0->m_accountID;
-		const auto rankLabel = static_cast<cocos2d::CCLabelBMFont*>(this->m_mainLayer->getChildByID("global-rank-label"));
-		const auto starsLabel = static_cast<cocos2d::CCLabelBMFont*>(this->m_mainLayer->getChildByIDRecursive("stars-label"));
-
-		if (updatedStars != NULL) {
-			auto array = updatedStars.as_array();
-			for (int i = 0; i < array.size(); i++) {
-				const int accountId = array.at(i)["account_id"].as_int();
-				if (accountId == profileId) {
-					if (rankLabel != nullptr && rankLabel->isVisible()) {
-						std::string resultText = "";
-						resultText = resultText + rankLabel->getString() + " / KR #" + std::to_string(array.at(i)["rank"].as_int());
-						rankLabel->setString(resultText.c_str());
-					}
-
-					const int starAmount = p0->m_stars - array.at(i)["prev_stat_value"].as_int();
-					if (starAmount != 0 && starsLabel != nullptr) {
-						std::string starChanges = "";
-						starChanges = starChanges + starsLabel->getString() + "\n(" + (starAmount >= 0 ? "+" : "") + std::to_string(starAmount) + ")";
-						starsLabel->setString(starChanges.c_str());
-						starsLabel->setAlignment(kCCTextAlignmentCenter);
-					}
-					break;
-				}
-			}
-		}
-		updateLabel(p0->m_accountID, p0->m_userCoins, updatedCoins, static_cast<cocos2d::CCLabelBMFont*>(this->m_mainLayer->getChildByIDRecursive("user-coins-label")));
-		updateLabel(p0->m_accountID, p0->m_demons, updatedDemons, static_cast<cocos2d::CCLabelBMFont*>(this->m_mainLayer->getChildByIDRecursive("demons-label")));
-		updateLabel(p0->m_accountID, p0->m_creatorPoints, updatedCp, static_cast<cocos2d::CCLabelBMFont*>(this->m_mainLayer->getChildByIDRecursive("creator-points-label")));
+	void onClose(CCObject* sender) {
+		ProfilePage::onClose(sender);
+		profilePage = nullptr;
 	}
 };
