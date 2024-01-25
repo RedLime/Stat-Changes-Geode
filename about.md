@@ -1,5 +1,4 @@
-# KR Profile Leaderboard
+# Stat Changes for Geode
 
-**This mod is only for Koreans!**
-Integrate GMD Korea Forum: Stats rank into ingame profile.
-Display changed stats in last 2 weeks on user profile.
+Display changed stats in last 1-4 weeks on user profile.
+Only players in the Top 10k of the [Updated Leaderboard](https://discord.gg/Uz7pd4d) are displayed.
