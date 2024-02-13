@@ -4,7 +4,6 @@
 
 using namespace geode::prelude;
 
-ProfilePage* profilePage = nullptr;
 matjson::Value cachedJson = nullptr;
 int lastAccountID = 0;
 
@@ -40,6 +39,7 @@ void updateLabel(int liveStat, int oldStat, cocos2d::CCLabelBMFont* label) {
 }
 
 void tryUpdateLabels() {
+	auto profilePage = static_cast<ProfilePage*>(CCScene::get()->getChildByID("ProfilePage"));
 	if (profilePage == nullptr || profilePage->m_accountID != lastAccountID) return;
 	
 	auto starsLabel = profilePage->m_mainLayer->getChildByIDRecursive("stars-label");
@@ -77,7 +77,6 @@ class $modify(ProfilePage) {
 		}
 			
 		lastAccountID = p0;
-		profilePage = this;
 		tryUpdateLabels();
 		return true;
 	}
@@ -86,10 +85,5 @@ class $modify(ProfilePage) {
 		ProfilePage::loadPageFromUserInfo(p0);
 		log::debug("tried");
 		tryUpdateLabels();
-	}
-
-	void onClose(CCObject* sender) {
-		ProfilePage::onClose(sender);
-		profilePage = nullptr;
 	}
 };
