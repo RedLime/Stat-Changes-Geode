@@ -1,4 +1,5 @@
 # 1.1.1
+- Support MacOS
 - Fixed crash when profile has closed or changed the scene
 
 # 1.1.0
