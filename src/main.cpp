@@ -58,6 +58,10 @@ void tryUpdateLabels() {
 }
 
 class $modify(ProfilePage) {
+	struct Fields {
+        EventListener<web::WebTask> m_listener;
+    };
+
 	bool init(int p0, bool p1) {
 		if (!ProfilePage::init(p0, p1)) return false;
 
@@ -65,23 +69,26 @@ class $modify(ProfilePage) {
 			const auto weeks = Mod::get()->getSettingValue<int64_t>("weeks");
 			const std::string targetUrl = "https://me.redlimerl.com/gdstats/" + std::to_string(p0) + "/" + std::to_string(weeks);
 			cachedJson = nullptr;
-			web::AsyncWebRequest()
-				.get(targetUrl)
-				.json()
-				.then([p0](matjson::Value const& json) {
-					cachedJson = json;
-				})
-				.expect([](std::string const& error) {
-					cachedJson = matjson::parse("null"); 
-				});
+			auto req = web::WebRequest();
+			auto task = req.get(targetUrl);
+
+			m_fields->m_listener.bind([] (web::WebTask::Event* e) {
+				if (web::WebResponse* value = e->getValue()) {
+					cachedJson = value->json().value();
+				} else if (e->isCancelled()) {
+					cachedJson = matjson::parse("null");
+				}
+			});
+			m_fields->m_listener.setFilter(task);
+			log::debug("start caching");
 		}
 			
 		lastAccountID = p0;
-		tryUpdateLabels();
+		Loader::get()->queueInMainThread(&tryUpdateLabels);
 		return true;
 	}
 
-	virtual TodoReturn loadPageFromUserInfo(GJUserScore* p0) {
+	void loadPageFromUserInfo(GJUserScore* p0) {
 		ProfilePage::loadPageFromUserInfo(p0);
 		log::debug("tried");
 		tryUpdateLabels();
