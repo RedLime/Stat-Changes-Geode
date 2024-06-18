@@ -1,5 +1,5 @@
 # 1.2.1
-- Support GD 2.206
+- Support GD 2.206 & Geode 3.0.0
 
 # 1.1.1
 - Support MacOS
