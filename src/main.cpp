@@ -70,16 +70,19 @@ class $modify(ProfilePage) {
 			const std::string targetUrl = "https://me.redlimerl.com/gdstats/" + std::to_string(p0) + "/" + std::to_string(weeks);
 			cachedJson = nullptr;
 			auto req = web::WebRequest();
-			auto task = req.get(targetUrl);
 
 			m_fields->m_listener.bind([] (web::WebTask::Event* e) {
 				if (web::WebResponse* value = e->getValue()) {
-					cachedJson = value->json().value();
+					if (value->ok()) {
+						cachedJson = value->json().value();
+						return;
+					}
+					cachedJson = matjson::parse("null");
 				} else if (e->isCancelled()) {
 					cachedJson = matjson::parse("null");
 				}
 			});
-			m_fields->m_listener.setFilter(task);
+			m_fields->m_listener.setFilter(req.get(targetUrl));
 			log::debug("start caching");
 		}
 			
@@ -88,8 +91,8 @@ class $modify(ProfilePage) {
 		return true;
 	}
 
-	void loadPageFromUserInfo(GJUserScore* p0) {
-		ProfilePage::loadPageFromUserInfo(p0);
+	virtual void getUserInfoFinished(GJUserScore* p0) {
+		ProfilePage::getUserInfoFinished(p0);
 		log::debug("tried");
 		tryUpdateLabels();
 	}
