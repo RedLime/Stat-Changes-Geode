@@ -1,3 +1,6 @@
+# 1.2.2
+- Support Geode 3.1.0
+
 # 1.2.1
 - Support GD 2.206 & Geode 3.0.0
 
