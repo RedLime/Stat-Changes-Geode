@@ -1,3 +1,6 @@
+# 1.2.4
+- Support GD 2.2074
+
 # 1.2.3
 - Support Geode 3.1.1
 

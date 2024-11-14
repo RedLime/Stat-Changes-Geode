@@ -1,17 +1,17 @@
 {
-	"geode": "3.1.1",
+	"geode": "4.0.0-alpha.1",
 	"gd": {
-		"win": "2.206",
-        "mac": "2.206",
-		"android": "2.206"
+		"win": "2.2074",
+        "mac": "2.2074",
+		"android": "2.2074"
 	},
-	"version": "v1.2.3",
+	"version": "v1.2.4",
 	"id": "redlime.statchanges",
 	"name": "Stat Changes",
 	"developer": "RedLime",
-	"description": "Displays changed stats during the specified period in the profile.",
-	"tags": [],
-	"repository": "https://github.com/RedLime/Stat-Changes-Geode",
+	"description": "Displays changed stats in the profile.",
+	"tags": ["online", "interface"],
+    "repository": "https://github.com/RedLime/Stat-Changes-Geode",
 	"issues": {
 		"info": "GitHub",
 		"url": "https://github.com/RedLime/Stat-Changes-Geode"

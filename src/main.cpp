@@ -47,13 +47,13 @@ void tryUpdateLabels() {
 		Loader::get()->queueInMainThread(&tryUpdateLabels);
 		return;
 	}
-	if (cachedJson.is_null() || starsLabel->getParent()->getChildByID("stars-label-changes") != nullptr) return;
+	if (cachedJson.isNull() || starsLabel->getParent()->getChildByID("stars-label-changes") != nullptr) return;
 
-	updateLabel(profilePage->m_score->m_stars, cachedJson["stars"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(starsLabel));
-	updateLabel(profilePage->m_score->m_moons, cachedJson["moons"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("moons-label")));
-	updateLabel(profilePage->m_score->m_userCoins, cachedJson["ucoins"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("user-coins-label")));
-	updateLabel(profilePage->m_score->m_demons, cachedJson["demons"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("demons-label")));
-	updateLabel(profilePage->m_score->m_creatorPoints, cachedJson["cp"].as_int(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("creator-points-label")));
+	updateLabel(profilePage->m_score->m_stars, cachedJson["stars"].asInt().unwrap(), static_cast<cocos2d::CCLabelBMFont*>(starsLabel));
+	updateLabel(profilePage->m_score->m_moons, cachedJson["moons"].asInt().unwrap(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("moons-label")));
+	updateLabel(profilePage->m_score->m_userCoins, cachedJson["ucoins"].asInt().unwrap(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("user-coins-label")));
+	updateLabel(profilePage->m_score->m_demons, cachedJson["demons"].asInt().unwrap(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("demons-label")));
+	updateLabel(profilePage->m_score->m_creatorPoints, cachedJson["cp"].asInt().unwrap(), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("creator-points-label")));
 	log::debug("updated");
 }
 
@@ -74,12 +74,12 @@ class $modify(ProfilePage) {
 			m_fields->m_listener.bind([] (web::WebTask::Event* e) {
 				if (web::WebResponse* value = e->getValue()) {
 					if (value->ok()) {
-						cachedJson = value->json().value();
+						cachedJson = value->json().unwrap();
 						return;
 					}
-					cachedJson = matjson::parse("null");
+					cachedJson = matjson::parse("null").unwrap();
 				} else if (e->isCancelled()) {
-					cachedJson = matjson::parse("null");
+					cachedJson = matjson::parse("null").unwrap();
 				}
 			});
 			m_fields->m_listener.setFilter(req.get(targetUrl));
