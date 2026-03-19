@@ -1,3 +1,7 @@
+# 1.2.7
+- Ported to Geode v5 (by [SorkoPiko](https://github.com/SorkoPiko))
+- Added session caching
+
 # 1.2.6
 - Support GD 2.2074 & Geode 4.0.0
 

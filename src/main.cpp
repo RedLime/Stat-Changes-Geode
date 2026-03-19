@@ -4,9 +4,7 @@
 
 using namespace geode::prelude;
 
-matjson::Value cachedJson = nullptr;
-int lastAccountID = 0;
-
+std::unordered_map<int, matjson::Value> cache;
 
 void updateLabel(int liveStat, int oldStat, cocos2d::CCLabelBMFont* label) {
 	const int changes = liveStat - oldStat;
@@ -38,62 +36,57 @@ void updateLabel(int liveStat, int oldStat, cocos2d::CCLabelBMFont* label) {
 	}
 }
 
-void tryUpdateLabels() {
-	auto profilePage = static_cast<ProfilePage*>(CCScene::get()->getChildByID("ProfilePage"));
-	if (profilePage == nullptr || profilePage->m_accountID != lastAccountID) return;
-	
+void tryUpdateLabels(ProfilePage* profilePage) {
+	if (profilePage == nullptr || !cache.contains(profilePage->m_accountID)) return;
+	matjson::Value cachedJson = cache[profilePage->m_accountID];
+
 	auto starsLabel = profilePage->m_mainLayer->getChildByIDRecursive("stars-label");
 	if (cachedJson == nullptr || starsLabel == nullptr || !starsLabel->isVisible()) {
-		Loader::get()->queueInMainThread(&tryUpdateLabels);
+		log::warn("can't update, missing data or label");
 		return;
 	}
 	if (cachedJson.isNull() || starsLabel->getParent()->getChildByID("stars-label-changes") != nullptr) return;
 
-	updateLabel(profilePage->m_score->m_stars, cachedJson["stars"].asInt().unwrapOr(profilePage->m_score->m_stars), static_cast<cocos2d::CCLabelBMFont*>(starsLabel));
-	updateLabel(profilePage->m_score->m_moons, cachedJson["moons"].asInt().unwrapOr(profilePage->m_score->m_moons), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("moons-label")));
-	updateLabel(profilePage->m_score->m_userCoins, cachedJson["ucoins"].asInt().unwrapOr(profilePage->m_score->m_userCoins), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("user-coins-label")));
-	updateLabel(profilePage->m_score->m_demons, cachedJson["demons"].asInt().unwrapOr(profilePage->m_score->m_demons), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("demons-label")));
-	updateLabel(profilePage->m_score->m_creatorPoints, cachedJson["cp"].asInt().unwrapOr(profilePage->m_score->m_creatorPoints), static_cast<cocos2d::CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("creator-points-label")));
+	updateLabel(profilePage->m_score->m_stars, cachedJson["stars"].asInt().unwrapOr(profilePage->m_score->m_stars), static_cast<CCLabelBMFont*>(starsLabel));
+	updateLabel(profilePage->m_score->m_moons, cachedJson["moons"].asInt().unwrapOr(profilePage->m_score->m_moons), static_cast<CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("moons-label")));
+	updateLabel(profilePage->m_score->m_userCoins, cachedJson["ucoins"].asInt().unwrapOr(profilePage->m_score->m_userCoins), static_cast<CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("user-coins-label")));
+	updateLabel(profilePage->m_score->m_demons, cachedJson["demons"].asInt().unwrapOr(profilePage->m_score->m_demons), static_cast<CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("demons-label")));
+	updateLabel(profilePage->m_score->m_creatorPoints, cachedJson["cp"].asInt().unwrapOr(profilePage->m_score->m_creatorPoints), static_cast<CCLabelBMFont*>(profilePage->m_mainLayer->getChildByIDRecursive("creator-points-label")));
 	log::debug("updated");
 }
 
 class $modify(ProfilePage) {
 	struct Fields {
-        EventListener<web::WebTask> m_listener;
+        TaskHolder<web::WebResponse> m_listener;
     };
 
-	bool init(int p0, bool p1) {
-		if (!ProfilePage::init(p0, p1)) return false;
+	bool init(const int accountID, const bool ownProfile) {
+		if (!ProfilePage::init(accountID, ownProfile)) return false;
 
-		if (p0 != lastAccountID) {
+		if (!cache.contains(accountID)) {
 			const auto weeks = Mod::get()->getSettingValue<int64_t>("weeks");
-			const std::string targetUrl = "https://me.redlimerl.com/gdstats/" + std::to_string(p0) + "/" + std::to_string(weeks);
-			cachedJson = nullptr;
-			auto req = web::WebRequest();
 
-			m_fields->m_listener.bind([] (web::WebTask::Event* e) {
-				if (web::WebResponse* value = e->getValue()) {
-					if (value->ok()) {
-						cachedJson = value->json().unwrapOr(nullptr);
-						return;
+			m_fields->m_listener.spawn(
+				web::WebRequest().get(fmt::format("https://me.redlimerl.com/gdstats/{}/{}", accountID, weeks)),
+				[this, accountID] (const web::WebResponse& res) {
+					if (res.ok()) {
+						cache[accountID] = res.json().unwrapOr(nullptr);
+						log::debug("cached data for account {}", accountID);
+						tryUpdateLabels(this);
+					} else {
+						cache[accountID] = matjson::parse("null").unwrapOr(nullptr);
 					}
-					cachedJson = matjson::parse("null").unwrapOr(nullptr);
-				} else if (e->isCancelled()) {
-					cachedJson = matjson::parse("null").unwrapOr(nullptr);
 				}
-			});
-			m_fields->m_listener.setFilter(req.get(targetUrl));
+			);
 			log::debug("start caching");
 		}
 			
-		lastAccountID = p0;
-		Loader::get()->queueInMainThread(&tryUpdateLabels);
 		return true;
 	}
 
-	virtual void getUserInfoFinished(GJUserScore* p0) {
-		ProfilePage::getUserInfoFinished(p0);
+	void loadPageFromUserInfo(GJUserScore* score){
+		ProfilePage::loadPageFromUserInfo(score);
 		log::debug("tried");
-		tryUpdateLabels();
+		tryUpdateLabels(this);
 	}
 };
